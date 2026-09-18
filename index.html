@@ -107,7 +107,6 @@
 </div>
 
 <script>
-  // ⚠️ 請填入原本標準格式的 GAS URL（以 /exec 結尾）
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbwema7dv5YFxOvTd1593_cpZrQFDHO27SCuduVOvI-3f2vJUyqKH31NwzMuXNNy4Z0gsg/exec';
   let allItems = [];
   let currentBase64Image = '';
@@ -127,7 +126,6 @@
     }
   }
 
-  // 採用 JSONP 抓取資料，繞過 Google 多帳號 Cookie 跨域阻擋
   function fetchItems() {
     const oldScript = document.getElementById('jsonp-script');
     if (oldScript) oldScript.remove();
@@ -156,9 +154,9 @@
       <div class="item-card">
         <img class="item-img" src="${item.imageUrl || 'https://via.placeholder.com/70?text=No+Img'}" alt="照片">
         <div class="item-info">
-          <div class="item-title">${item.itemName} <span style="font-size:0.8rem;font-weight:normal;color:#666;">[${item.status}]</span></div>
-          <div class="item-path">📍 ${item.locationPath}</div>
-          <div class="item-meta">🏷️ ${item.category || '無標籤'} | 📝 ${item.note || '無備註'}</div>
+          <div class="item-title">${String(item.itemName || '')} <span style="font-size:0.8rem;font-weight:normal;color:#666;">[${String(item.status || '')}]</span></div>
+          <div class="item-path">📍 ${String(item.locationPath || '')}</div>
+          <div class="item-meta">🏷️ ${String(item.category || '無標籤')} | 📝 ${String(item.note || '無備註')}</div>
           <div class="action-btns">
             <button class="btn-sm btn-edit" onclick="editItem('${item.id}')">編輯</button>
             <button class="btn-sm btn-del" onclick="deleteItem('${item.id}')">刪除</button>
@@ -168,14 +166,17 @@
     `).join('');
   }
 
+  // 修正：將所有欄位轉為 String() 防呆，避免數字/日期欄位引發 toLowerCase 錯誤
   function filterItems() {
     const query = document.getElementById('searchInput').value.toLowerCase();
-    const filtered = allItems.filter(i => 
-      i.itemName.toLowerCase().includes(query) ||
-      i.category.toLowerCase().includes(query) ||
-      i.locationPath.toLowerCase().includes(query) ||
-      i.note.toLowerCase().includes(query)
-    );
+    const filtered = allItems.filter(i => {
+      const name = String(i.itemName || '').toLowerCase();
+      const category = String(i.category || '').toLowerCase();
+      const location = String(i.locationPath || '').toLowerCase();
+      const note = String(i.note || '').toLowerCase();
+
+      return name.includes(query) || category.includes(query) || location.includes(query) || note.includes(query);
+    });
     renderItems(filtered);
   }
 
@@ -224,7 +225,6 @@
     };
   }
 
-  // POST 請求：使用 redirect: 'follow' 與 text/plain header 避免跨域重導向失敗
   document.getElementById('itemForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
@@ -274,11 +274,11 @@
     if (!item) return;
 
     document.getElementById('itemId').value = item.id;
-    document.getElementById('itemName').value = item.itemName;
-    document.getElementById('category').value = item.category;
-    document.getElementById('locationPath').value = item.locationPath;
-    document.getElementById('status').value = item.status;
-    document.getElementById('note').value = item.note;
+    document.getElementById('itemName').value = String(item.itemName || '');
+    document.getElementById('category').value = String(item.category || '');
+    document.getElementById('locationPath').value = String(item.locationPath || '');
+    document.getElementById('status').value = String(item.status || '在原位');
+    document.getElementById('note').value = String(item.note || '');
     
     if (item.imageUrl) {
       document.getElementById('photoPreview').innerHTML = `<img src="${item.imageUrl}">`;
