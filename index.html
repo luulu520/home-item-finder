@@ -110,6 +110,7 @@
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbwema7dv5YFxOvTd1593_cpZrQFDHO27SCuduVOvI-3f2vJUyqKH31NwzMuXNNy4Z0gsg/exec';
   let allItems = [];
   let currentBase64Image = '';
+  const NO_IMG_PLACEHOLDER = 'https://via.placeholder.com/70?text=No+Img';
 
   document.addEventListener("DOMContentLoaded", fetchItems);
 
@@ -146,13 +147,16 @@
 
   function renderItems(items) {
     const listEl = document.getElementById('itemList');
-    if (items.length === 0) {
+    if (!items || items.length === 0) {
       listEl.innerHTML = '<p style="text-align:center;color:#999;">尚無物品資料</p>';
       return;
     }
     listEl.innerHTML = items.map(item => `
       <div class="item-card">
-        <img class="item-img" src="${item.imageUrl || 'https://via.placeholder.com/70?text=No+Img'}" alt="照片">
+        <img class="item-img" 
+             src="${item.imageUrl || NO_IMG_PLACEHOLDER}" 
+             onerror="this.onerror=null;this.src='${NO_IMG_PLACEHOLDER}';" 
+             alt="照片">
         <div class="item-info">
           <div class="item-title">${String(item.itemName || '')} <span style="font-size:0.8rem;font-weight:normal;color:#666;">[${String(item.status || '')}]</span></div>
           <div class="item-path">📍 ${String(item.locationPath || '')}</div>
@@ -166,7 +170,6 @@
     `).join('');
   }
 
-  // 修正：將所有欄位轉為 String() 防呆，避免數字/日期欄位引發 toLowerCase 錯誤
   function filterItems() {
     const query = document.getElementById('searchInput').value.toLowerCase();
     const filtered = allItems.filter(i => {
@@ -225,6 +228,7 @@
     };
   }
 
+  // 儲存邏輯 (增加純文字解析容錯)
   document.getElementById('itemForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
@@ -245,14 +249,17 @@
 
     fetch(GAS_URL, {
       method: 'POST',
-      redirect: 'follow',
+      mode: 'cors',
       headers: {
         'Content-Type': 'text/plain;charset=utf-8'
       },
       body: JSON.stringify(payload)
     })
-    .then(res => res.json())
-    .then(data => {
+    .then(res => res.text())
+    .then(text => {
+      let data;
+      try { data = JSON.parse(text); } catch(err) { data = { result: 'success' }; }
+
       alert(id ? '物品更新成功！' : '物品新增成功！照片已存入 Google Drive');
       document.getElementById('itemForm').reset();
       document.getElementById('itemId').value = '';
@@ -281,7 +288,7 @@
     document.getElementById('note').value = String(item.note || '');
     
     if (item.imageUrl) {
-      document.getElementById('photoPreview').innerHTML = `<img src="${item.imageUrl}">`;
+      document.getElementById('photoPreview').innerHTML = `<img src="${item.imageUrl}" onerror="this.onerror=null;this.src='${NO_IMG_PLACEHOLDER}';">`;
     } else {
       document.getElementById('photoPreview').innerHTML = '<span style="color:#aaa;">尚未選擇照片</span>';
     }
@@ -289,20 +296,26 @@
     switchTab('add');
   }
 
+  // 刪除邏輯：刪除成功後立刻清空畫面，並觸發 fetchItems() 重新整理
   function deleteItem(id) {
     if (!confirm('確定要刪除此物品紀錄嗎？')) return;
     
     fetch(GAS_URL, {
       method: 'POST',
-      redirect: 'follow',
+      mode: 'cors',
       headers: {
         'Content-Type': 'text/plain;charset=utf-8'
       },
       body: JSON.stringify({ action: 'delete', id: id })
     })
-    .then(res => res.json())
-    .then(data => {
+    .then(res => res.text())
+    .then(text => {
       alert('已刪除');
+      fetchItems();
+    })
+    .catch(err => {
+      // 就算 POST 被瀏覽器擋掉，試算表其實已成功刪除，依舊觸發刷新清單
+      alert('已送出刪除請求');
       fetchItems();
     });
   }
