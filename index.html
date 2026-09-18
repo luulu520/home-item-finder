@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>物品定位管理系統</title>
+  <title>家庭物品定位管理系統</title>
   <style>
     :root { --primary-color: #2c3e50; --accent-color: #3498db; --bg-color: #f8f9fa; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-color); margin: 0; padding: 15px; }
@@ -107,7 +107,7 @@
 </div>
 
 <script>
-  // ⚠️ 請在此處貼上您的 GAS Web App 部署網址
+  // ⚠️ 請填入原本標準格式的 GAS URL（以 /exec 結尾）
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbwema7dv5YFxOvTd1593_cpZrQFDHO27SCuduVOvI-3f2vJUyqKH31NwzMuXNNy4Z0gsg/exec';
   let allItems = [];
   let currentBase64Image = '';
@@ -127,16 +127,23 @@
     }
   }
 
+  // 採用 JSONP 抓取資料，繞過 Google 多帳號 Cookie 跨域阻擋
   function fetchItems() {
-    fetch(GAS_URL)
-      .then(res => res.json())
-      .then(data => {
-        allItems = data;
-        renderItems(allItems);
-      })
-      .catch(err => {
-        document.getElementById('itemList').innerHTML = '讀取失敗，請確認 API 設定。';
-      });
+    const oldScript = document.getElementById('jsonp-script');
+    if (oldScript) oldScript.remove();
+
+    window.handleGASResponse = function(data) {
+      allItems = data;
+      renderItems(allItems);
+    };
+
+    const script = document.createElement('script');
+    script.id = 'jsonp-script';
+    script.src = `${GAS_URL}?callback=handleGASResponse&_=${new Date().getTime()}`;
+    script.onerror = function() {
+      document.getElementById('itemList').innerHTML = '讀取失敗，請確認 API 設定或重新整理。';
+    };
+    document.body.appendChild(script);
   }
 
   function renderItems(items) {
@@ -172,7 +179,6 @@
     renderItems(filtered);
   }
 
-  // 照片壓縮與預覽
   function previewImage(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -218,6 +224,7 @@
     };
   }
 
+  // POST 請求：使用 redirect: 'follow' 與 text/plain header 避免跨域重導向失敗
   document.getElementById('itemForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
@@ -238,6 +245,10 @@
 
     fetch(GAS_URL, {
       method: 'POST',
+      redirect: 'follow',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
       body: JSON.stringify(payload)
     })
     .then(res => res.json())
@@ -283,6 +294,10 @@
     
     fetch(GAS_URL, {
       method: 'POST',
+      redirect: 'follow',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
       body: JSON.stringify({ action: 'delete', id: id })
     })
     .then(res => res.json())
